@@ -1,0 +1,10 @@
+
+[[redirects]]
+  #呼叫的「假」路徑
+  from = "/api/*"
+
+  #「真正」呼叫的「不安全」AI 伺服器
+  to = "http://163.25.99.25:5000/:splat"
+
+  status = 200
+  force = true
