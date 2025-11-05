@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MedGemma AI 醫療分析系統</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #2563eb;
+            --secondary-color: #0ea5e9;
+            --accent-color: #06b6d4;
+            --dark-bg: #0f172a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(148, 163, 184, 0.2);
+            --success-color: #10b981;
+            --error-color: #ef4444;
+            --warning-color: #f59e0b;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* 動態背景效果 */
+        .bg-animation {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            z-index: -1;
+            opacity: 0.5;
+        }
+
+        .bg-animation::before,
+        .bg-animation::after {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            border-radius: 50%;
+            background: radial-gradient(circle, var(--primary-color) 0%, transparent 70%);
+            filter: blur(100px);
+            animation: float 20s infinite ease-in-out;
+        }
+
+        .bg-animation::before {
+            top: -200px;
+            right: -200px;
+            animation-delay: 0s;
+        }
+
+        .bg-animation::after {
+            bottom: -200px;
+            left: -200px;
+            animation-delay: 10s;
+            background: radial-gradient(circle, var(--accent-color) 0%, transparent 70%);
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            33% { transform: translate(30px, -30px) scale(1.1); }
+            66% { transform: translate(-20px, 20px) scale(0.9); }
+        }
+
+        /* 浮水印 */
+        .watermark {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 120px;
+            color: rgba(255, 255, 255, 0.03);
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 0;
+            white-space: nowrap;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* API 設定面板 */
+        .config-panel {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 1rem;
+            z-index: 100;
+            transition: all 0.3s ease;
+        }
+
+        .config-toggle {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border: none;
+            border-radius: 8px;
+            color: white;
+            padding: 0.5rem 1rem;
+            cursor: pointer;
+            font-size: 0.9rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .config-content {
+            display: none;
+            margin-top: 1rem;
+            width: 300px;
+        }
+
+        .config-content.active {
+            display: block;
+        }
+
+        .config-group {
+            margin-bottom: 1rem;
+        }
+
+        .config-label {
+            display: block;
+            margin-bottom: 0.3rem;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .config-input {
+            width: 100%;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .config-select {
+            width: 100%;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.85rem;
+        }
+
+        .config-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 6px;
+            margin-top: 0.5rem;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--error-color);
+        }
+
+        .status-dot.connected {
+            background: var(--success-color);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            50% { box-shadow: 0 0 0 10px rgba(16, 185, 129, 0); }
+        }
+
+        /* 標題區域 */
+        .header {
+            text-align: center;
+            margin-bottom: 3rem;
+            animation: fadeInDown 0.8s ease;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 0.5rem;
+            font-weight: 800;
+            letter-spacing: -1px;
+        }
+
+        .header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+        }
+
+        /* 主要內容區域 */
+        .main-content {
+            display: none;
+            animation: fadeIn 0.6s ease;
+        }
+
+        .main-content.active {
+            display: block;
+        }
+
+        /* 輸入表單 */
+        .input-section {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .form-group {
+            margin-bottom: 2rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.8rem;
+            font-weight: 500;
+            color: var(--text-primary);
+            font-size: 1.1rem;
+        }
+
+        .text-input {
+            width: 100%;
+            min-height: 150px;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border: 2px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            resize: vertical;
+            transition: all 0.3s ease;
+        }
+
+        .text-input:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background: rgba(255, 255, 255, 0.08);
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        /* 檔案上傳區域 */
+        .file-upload-area {
+            position: relative;
+            padding: 3rem;
+            background: rgba(255, 255, 255, 0.02);
+            border: 2px dashed var(--border-color);
+            border-radius: 12px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .file-upload-area:hover {
+            border-color: var(--primary-color);
+            background: rgba(37, 99, 235, 0.05);
+        }
+
+        .file-upload-area.dragover {
+            border-color: var(--accent-color);
+            background: rgba(6, 182, 212, 0.1);
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .upload-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 1rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+        }
+
+        .upload-text {
+            color: var(--text-secondary);
+            margin-bottom: 0.5rem;
+        }
+
+        .file-types {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+            opacity: 0.7;
+        }
+
+        /* 預覽區域 */
+        .preview-area {
+            margin-top: 1.5rem;
+            display: none;
+        }
+
+        .preview-area.active {
+            display: block;
+        }
+
+        .preview-item {
+            display: flex;
+            align-items: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            margin-bottom: 0.5rem;
+        }
+
+        .preview-item img {
+            width: 60px;
+            height: 60px;
+            object-fit: cover;
+            border-radius: 6px;
+            margin-right: 1rem;
+        }
+
+        .preview-info {
+            flex: 1;
+        }
+
+        .preview-name {
+            font-weight: 500;
+            margin-bottom: 0.2rem;
+        }
+
+        .preview-size {
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+
+        .remove-file {
+            padding: 0.5rem 1rem;
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid rgba(239, 68, 68, 0.3);
+            color: #ef4444;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .remove-file:hover {
+            background: rgba(239, 68, 68, 0.3);
+        }
+
+        /* 按鈕 */
+        .submit-btn {
+            width: 100%;
+            padding: 1.2rem 2rem;
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            border: none;
+            border-radius: 12px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .submit-btn::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .submit-btn:hover::before {
+            left: 100%;
+        }
+
+        .submit-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Loading 動畫 */
+        .loading-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(15, 23, 42, 0.95);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        .loading-overlay.active {
+            display: flex;
+        }
+
+        .loader {
+            width: 80px;
+            height: 80px;
+            border: 4px solid var(--border-color);
+            border-top: 4px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 1.5rem;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .loading-text {
+            font-size: 1.2rem;
+            color: var(--text-primary);
+            animation: pulse 2s ease infinite;
+        }
+
+        /* 結果顯示區域 */
+        .results-section {
+            display: none;
+            animation: fadeIn 0.8s ease;
+        }
+
+        .results-section.active {
+            display: block;
+        }
+
+        .result-card {
+            background: var(--card-bg);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 2.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .result-card::before {
+            content: 'MedGemma AI';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            font-size: 80px;
+            color: rgba(255, 255, 255, 0.02);
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .result-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, var(--success-color), var(--accent-color));
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 1.5rem;
+            font-size: 1.5rem;
+        }
+
+        .result-title {
+            flex: 1;
+        }
+
+        .result-title h2 {
+            font-size: 1.8rem;
+            margin-bottom: 0.3rem;
+            color: var(--text-primary);
+        }
+
+        .result-date {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+        }
+
+        .result-content {
+            position: relative;
+            z-index: 1;
+        }
+
+        .result-section {
+            margin-bottom: 2rem;
+        }
+
+        .result-section h3 {
+            color: var(--primary-color);
+            margin-bottom: 1rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .result-section h3::before {
+            content: '';
+            display: inline-block;
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(180deg, var(--primary-color), var(--accent-color));
+            margin-right: 0.8rem;
+            border-radius: 2px;
+        }
+
+        .result-text {
+            color: var(--text-primary);
+            line-height: 1.8;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            border-left: 3px solid var(--primary-color);
+        }
+
+        .analyzed-image {
+            max-width: 100%;
+            border-radius: 12px;
+            margin: 1rem 0;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        /* 操作按鈕區 */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+            position: relative;
+            z-index: 1;
+        }
+
+        .btn {
+            flex: 1;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-color), var(--accent-color));
+            color: white;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        /* 動畫 */
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes fadeInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* 響應式設計 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+
+            .container {
+                padding: 1rem;
+            }
+
+            .input-section, .result-card {
+                padding: 1.5rem;
+            }
+
+            .action-buttons {
+                flex-direction: column;
+            }
+
+            .watermark {
+                font-size: 60px;
+            }
+
+            .config-panel {
+                right: 0.5rem;
+                top: 0.5rem;
+            }
+        }
+
+        /* 提示訊息 */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            padding: 1rem 1.5rem;
+            background: var(--success-color);
+            color: white;
+            border-radius: 10px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            transform: translateX(400px);
+            transition: transform 0.3s ease;
+            z-index: 2000;
+            max-width: 350px;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+        }
+
+        .toast.error {
+            background: var(--error-color);
+        }
+
+        .toast.warning {
+            background: var(--warning-color);
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-animation"></div>
+    <div class="watermark">MEDGEMMA AI</div>
+
+    <!-- API 設定面板 -->
+    <div class="config-panel">
+        <button class="config-toggle" onclick="toggleConfig()">
+            ⚙️ API 設定
+        </button>
+        <div class="config-content" id="configContent">
+            <div class="config-group">
+                <label class="config-label">API 端點選擇</label>
+                <select class="config-select" id="apiEndpoint" onchange="updateApiConfig()">
+                    <option value="n8n">n8n Webhook</option>
+                    <option value="direct">直接連接伺服器</option>
+                    <option value="demo">示範模式</option>
+                </select>
+            </div>
+            <div class="config-group">
+                <label class="config-label">n8n Webhook URL</label>
+                <input type="text" class="config-input" id="n8nUrl" 
+                       placeholder="https://your-n8n.com/webhook/...">
+            </div>
+            <div class="config-group">
+                <label class="config-label">伺服器 API URL</label>
+                <input type="text" class="config-input" id="serverUrl" 
+                       placeholder="http://your-server:5000/api/analyze">
+            </div>
+            <div class="config-group">
+                <label class="config-label">API 金鑰 (選填)</label>
+                <input type="password" class="config-input" id="apiKey" 
+                       placeholder="your-api-key">
+            </div>
+            <div class="config-status">
+                <span class="status-dot" id="statusDot"></span>
+                <span id="statusText">未連接</span>
+            </div>
+            <button class="btn btn-primary" style="margin-top: 1rem; width: 100%;" onclick="testConnection()">
+                測試連線
+            </button>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 標題 -->
+        <div class="header">
+            <h1>MedGemma AI 醫療分析系統</h1>
+            <p>智能醫療影像與文字分析平台 | Powered by Advanced AI</p>
+        </div>
+
+        <!-- 輸入介面 -->
+        <div class="main-content active" id="inputSection">
+            <div class="input-section">
+                <div class="form-group">
+                    <label for="textInput">📝 病徵描述 / 醫療文字資料</label>
+                    <textarea 
+                        id="textInput" 
+                        class="text-input" 
+                        placeholder="請輸入病人症狀描述、病史資料或其他相關醫療文字資訊..."
+                    ></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>🏥 醫療影像上傳</label>
+                    <div class="file-upload-area" id="fileUploadArea">
+                        <input type="file" id="fileInput" class="file-input" accept="image/*" multiple>
+                        <div class="upload-icon">📤</div>
+                        <div class="upload-text">點擊或拖曳檔案至此處上傳</div>
+                        <div class="file-types">支援格式：X光片、CT、MRI、病理切片等醫療影像 (JPG, PNG, DICOM)</div>
+                    </div>
+                    <div class="preview-area" id="previewArea"></div>
+                </div>
+
+                <button class="submit-btn" id="analyzeBtn">
+                    🔬 開始AI分析
+                </button>
+            </div>
+        </div>
+
+        <!-- 分析結果顯示 -->
+        <div class="results-section" id="resultsSection">
+            <div class="result-card">
+                <div class="result-header">
+                    <div class="result-icon">✅</div>
+                    <div class="result-title">
+                        <h2>醫療分析報告</h2>
+                        <div class="result-date" id="resultDate"></div>
+                    </div>
+                </div>
+
+                <div class="result-content">
+                    <div class="result-section">
+                        <h3>影像分析結果</h3>
+                        <div id="imageAnalysis" class="result-text">
+                            <!-- 影像分析結果將顯示在這裡 -->
+                        </div>
+                        <img id="analyzedImage" class="analyzed-image" style="display:none;">
+                    </div>
+
+                    <div class="result-section">
+                        <h3>文字分析結果</h3>
+                        <div id="textAnalysis" class="result-text">
+                            <!-- 文字分析結果將顯示在這裡 -->
+                        </div>
+                    </div>
+
+                    <div class="result-section">
+                        <h3>診斷建議</h3>
+                        <div id="diagnosis" class="result-text">
+                            <!-- 診斷建議將顯示在這裡 -->
+                        </div>
+                    </div>
+
+                    <div class="result-section">
+                        <h3>後續建議</h3>
+                        <div id="recommendations" class="result-text">
+                            <!-- 後續建議將顯示在這裡 -->
+                        </div>
+                    </div>
+                </div>
+
+                <div class="action-buttons">
+                    <button class="btn btn-primary" onclick="window.print()">
+                        📄 列印報告
+                    </button>
+                    <button class="btn btn-primary" onclick="downloadReport()">
+                        💾 下載報告
+                    </button>
+                    <button class="btn btn-secondary" onclick="newAnalysis()">
+                        🔄 新增分析
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading 畫面 -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loader"></div>
+        <div class="loading-text">AI 正在分析中，請稍候...</div>
+    </div>
+
+    <!-- Toast 提示 -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // API 設定
+        const API_CONFIG = {
+            // 從 localStorage 讀取設定，或使用預設值
+            N8N_WEBHOOK: localStorage.getItem('n8n_webhook') || '',
+            DIRECT_API: localStorage.getItem('direct_api') || '',
+            USE_ENDPOINT: localStorage.getItem('use_endpoint') || 'demo',
+            API_KEY: localStorage.getItem('api_key') || '',
+            TIMEOUT: 30000
+        };
+
+        // 全域變數
+        let uploadedFiles = [];
+
+        // DOM 元素
+        const fileInput = document.getElementById('fileInput');
+        const fileUploadArea = document.getElementById('fileUploadArea');
+        const previewArea = document.getElementById('previewArea');
+        const textInput = document.getElementById('textInput');
+        const analyzeBtn = document.getElementById('analyzeBtn');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+        const inputSection = document.getElementById('inputSection');
+        const resultsSection = document.getElementById('resultsSection');
+        const toast = document.getElementById('toast');
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            setupFileUpload();
+            setupEventListeners();
+            loadApiConfig();
+        });
+
+        // 載入 API 設定
+        function loadApiConfig() {
+            document.getElementById('apiEndpoint').value = API_CONFIG.USE_ENDPOINT;
+            document.getElementById('n8nUrl').value = API_CONFIG.N8N_WEBHOOK;
+            document.getElementById('serverUrl').value = API_CONFIG.DIRECT_API;
+            document.getElementById('apiKey').value = API_CONFIG.API_KEY;
+            updateApiConfig();
+        }
+
+        // 更新 API 設定
+        function updateApiConfig() {
+            const endpoint = document.getElementById('apiEndpoint').value;
+            const n8nUrl = document.getElementById('n8nUrl').value;
+            const serverUrl = document.getElementById('serverUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+
+            API_CONFIG.USE_ENDPOINT = endpoint;
+            API_CONFIG.N8N_WEBHOOK = n8nUrl;
+            API_CONFIG.DIRECT_API = serverUrl;
+            API_CONFIG.API_KEY = apiKey;
+
+            // 儲存到 localStorage
+            localStorage.setItem('use_endpoint', endpoint);
+            localStorage.setItem('n8n_webhook', n8nUrl);
+            localStorage.setItem('direct_api', serverUrl);
+            localStorage.setItem('api_key', apiKey);
+
+            // 更新狀態顯示
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+            
+            if (endpoint === 'demo') {
+                statusDot.classList.add('connected');
+                statusText.textContent = '示範模式';
+            } else {
+                statusDot.classList.remove('connected');
+                statusText.textContent = '未測試';
+            }
+        }
+
+        // 切換設定面板
+        function toggleConfig() {
+            const configContent = document.getElementById('configContent');
+            configContent.classList.toggle('active');
+        }
+
+        // 測試連線
+        async function testConnection() {
+            const endpoint = API_CONFIG.USE_ENDPOINT;
+            const statusDot = document.getElementById('statusDot');
+            const statusText = document.getElementById('statusText');
+
+            if (endpoint === 'demo') {
+                statusDot.classList.add('connected');
+                statusText.textContent = '示範模式';
+                showToast('示範模式已啟用', 'success');
+                return;
+            }
+
+            statusText.textContent = '測試中...';
+            
+            try {
+                const url = endpoint === 'n8n' ? API_CONFIG.N8N_WEBHOOK : API_CONFIG.DIRECT_API;
+                
+                if (!url) {
+                    throw new Error('請先設定 API URL');
+                }
+
+                const response = await fetch(url, {
+                    method: 'OPTIONS',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(API_CONFIG.API_KEY && {
+                            'Authorization': `Bearer ${API_CONFIG.API_KEY}`
+                        })
+                    },
+                    signal: AbortSignal.timeout(5000)
+                });
+
+                if (response.ok || response.status === 204) {
+                    statusDot.classList.add('connected');
+                    statusText.textContent = '連線成功';
+                    showToast('API 連線測試成功！', 'success');
+                } else {
+                    throw new Error(`HTTP ${response.status}`);
+                }
+            } catch (error) {
+                statusDot.classList.remove('connected');
+                statusText.textContent = '連線失敗';
+                showToast(`連線失敗: ${error.message}`, 'error');
+            }
+        }
+
+        // 設置檔案上傳
+        function setupFileUpload() {
+            fileUploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', handleFileSelect);
+
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.add('dragover');
+            });
+
+            fileUploadArea.addEventListener('dragleave', () => {
+                fileUploadArea.classList.remove('dragover');
+            });
+
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.classList.remove('dragover');
+                handleFiles(e.dataTransfer.files);
+            });
+        }
+
+        // 設置事件監聽器
+        function setupEventListeners() {
+            analyzeBtn.addEventListener('click', performAnalysis);
+        }
+
+        // 處理檔案選擇
+        function handleFileSelect(e) {
+            handleFiles(e.target.files);
+        }
+
+        // 處理檔案
+        function handleFiles(files) {
+            for (let file of files) {
+                if (file.type.startsWith('image/')) {
+                    uploadedFiles.push(file);
+                    displayPreview(file);
+                } else {
+                    showToast('請上傳圖片格式的醫療影像', 'error');
+                }
+            }
+            
+            if (uploadedFiles.length > 0) {
+                previewArea.classList.add('active');
+            }
+        }
+
+        // 顯示預覽
+        function displayPreview(file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const previewItem = document.createElement('div');
+                previewItem.className = 'preview-item';
+                previewItem.innerHTML = `
+                    <img src="${e.target.result}" alt="預覽">
+                    <div class="preview-info">
+                        <div class="preview-name">${file.name}</div>
+                        <div class="preview-size">${formatFileSize(file.size)}</div>
+                    </div>
+                    <button class="remove-file" onclick="removeFile('${file.name}')">移除</button>
+                `;
+                previewArea.appendChild(previewItem);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 格式化檔案大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+
+        // 移除檔案
+        function removeFile(fileName) {
+            uploadedFiles = uploadedFiles.filter(file => file.name !== fileName);
+            
+            previewArea.innerHTML = '';
+            uploadedFiles.forEach(file => displayPreview(file));
+            
+            if (uploadedFiles.length === 0) {
+                previewArea.classList.remove('active');
+            }
+        }
+
+        // 執行分析
+        async function performAnalysis() {
+            const textContent = textInput.value.trim();
+            
+            if (!textContent && uploadedFiles.length === 0) {
+                showToast('請輸入文字或上傳影像', 'error');
+                return;
+            }
+
+            loadingOverlay.classList.add('active');
+            analyzeBtn.disabled = true;
+
+            try {
+                // 如果是示範模式
+                if (API_CONFIG.USE_ENDPOINT === 'demo') {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    
+                    const demoResult = {
+                        imageAnalysis: "根據上傳的X光影像分析，觀察到肺部右下葉有輕微陰影，密度略高於正常組織。影像品質良好，可清楚辨識各解剖結構。未發現明顯的骨折或異常鈣化現象。",
+                        textAnalysis: "根據提供的病徵描述，患者出現持續性咳嗽、輕微發燒等症狀，符合呼吸道感染的臨床表現。建議進一步進行實驗室檢查以確定病原體。",
+                        diagnosis: "初步診斷：疑似輕度肺炎。影像學表現與臨床症狀一致，建議進行進一步的血液檢查和痰液培養以確定病原體類型。",
+                        recommendations: "1. 建議進行血常規檢查和CRP檢測\n2. 痰液細菌培養及藥敏試驗\n3. 適當的抗生素治療\n4. 充足休息和水分補充\n5. 一週後複診追蹤"
+                    };
+                    
+                    displayResults(demoResult);
+                    showToast('示範模式：分析完成', 'warning');
+                    return;
+                }
+
+                // 準備資料
+                const imagePromises = uploadedFiles.map(file => {
+                    return new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve({
+                            name: file.name,
+                            data: e.target.result,
+                            type: file.type
+                        });
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    });
+                });
+                
+                const images = await Promise.all(imagePromises);
+                
+                // 選擇 API 端點
+                const apiUrl = API_CONFIG.USE_ENDPOINT === 'n8n' 
+                    ? API_CONFIG.N8N_WEBHOOK 
+                    : API_CONFIG.DIRECT_API;
+                
+                if (!apiUrl) {
+                    throw new Error('請先在設定面板中配置 API 端點');
+                }
+                
+                // 建立請求
+                const requestBody = {
+                    text: textContent,
+                    images: images,
+                    timestamp: new Date().toISOString(),
+                    source: 'web-frontend'
+                };
+                
+                // 發送請求
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        ...(API_CONFIG.API_KEY && {
+                            'Authorization': `Bearer ${API_CONFIG.API_KEY}`
+                        })
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: AbortSignal.timeout(API_CONFIG.TIMEOUT)
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                
+                // 處理回應
+                if (result.success && result.data) {
+                    displayResults(result.data);
+                } else {
+                    displayResults(result);
+                }
+                
+            } catch (error) {
+                console.error('分析失敗:', error);
+                
+                let errorMessage = '分析失敗：';
+                if (error.name === 'AbortError') {
+                    errorMessage += '請求超時，請稍後再試';
+                } else if (error.message.includes('fetch')) {
+                    errorMessage += '無法連接到伺服器，請檢查 API 設定';
+                } else {
+                    errorMessage += error.message;
+                }
+                
+                showToast(errorMessage, 'error');
+            } finally {
+                loadingOverlay.classList.remove('active');
+                analyzeBtn.disabled = false;
+            }
+        }
+
+        // 顯示分析結果
+        function displayResults(result) {
+            document.getElementById('resultDate').textContent = 
+                new Date().toLocaleString('zh-TW', { 
+                    year: 'numeric', 
+                    month: '2-digit', 
+                    day: '2-digit', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+
+            document.getElementById('imageAnalysis').textContent = 
+                result.imageAnalysis || '無影像分析資料';
+            document.getElementById('textAnalysis').textContent = 
+                result.textAnalysis || '無文字分析資料';
+            document.getElementById('diagnosis').textContent = 
+                result.diagnosis || '無診斷建議';
+            document.getElementById('recommendations').textContent = 
+                result.recommendations || '無後續建議';
+
+            if (uploadedFiles.length > 0) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const img = document.getElementById('analyzedImage');
+                    img.src = e.target.result;
+                    img.style.display = 'block';
+                };
+                reader.readAsDataURL(uploadedFiles[0]);
+            }
+
+            inputSection.classList.remove('active');
+            resultsSection.classList.add('active');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+            
+            showToast('分析完成！', 'success');
+        }
+
+        // 新增分析
+        function newAnalysis() {
+            textInput.value = '';
+            fileInput.value = '';
+            uploadedFiles = [];
+            previewArea.innerHTML = '';
+            previewArea.classList.remove('active');
+            
+            resultsSection.classList.remove('active');
+            inputSection.classList.add('active');
+            
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // 下載報告
+        function downloadReport() {
+            const reportContent = {
+                date: document.getElementById('resultDate').textContent,
+                imageAnalysis: document.getElementById('imageAnalysis').textContent,
+                textAnalysis: document.getElementById('textAnalysis').textContent,
+                diagnosis: document.getElementById('diagnosis').textContent,
+                recommendations: document.getElementById('recommendations').textContent
+            };
+
+            const reportText = `
+醫療分析報告
+=====================================
+生成日期：${reportContent.date}
+
+【影像分析結果】
+${reportContent.imageAnalysis}
+
+【文字分析結果】
+${reportContent.textAnalysis}
+
+【診斷建議】
+${reportContent.diagnosis}
+
+【後續建議】
+${reportContent.recommendations}
+
+=====================================
+此報告由 MedGemma AI 醫療分析系統生成
+            `;
+
+            const blob = new Blob([reportText], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `醫療分析報告_${new Date().getTime()}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showToast('報告已下載', 'success');
+        }
+
+        // 顯示提示訊息
+        function showToast(message, type = 'success') {
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 4000);
+        }
+    </script>
+</body>
+</html>
