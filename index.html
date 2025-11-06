@@ -928,7 +928,7 @@
                             'Authorization': `Bearer ${API_CONFIG.API_KEY}`
                         })
                     },
-                    signal: AbortSignal.timeout(5000)
+                    signal: AbortSignal.timeout(180000)
                 });
 
                 if (response.ok || response.status === 204) {
