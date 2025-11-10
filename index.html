@@ -269,12 +269,7 @@
             background: rgba(255, 255, 255, 0.08);
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
-        input[type="email"].text-input {
-            min-height: auto;
-            height: auto;
-            font-size: 1rem;
-            font-family: inherit;
-        }
+
         /* 檔案上傳區域 */
         .file-upload-area {
             position: relative;
@@ -696,7 +691,6 @@
                 <select class="config-select" id="apiEndpoint" onchange="updateApiConfig()">
                     <option value="n8n">n8n Webhook</option>
                     <option value="direct">直接連接伺服器</option>
-                    <option value="demo">示範模式</option>
                 </select>
             </div>
             <div class="config-group">
@@ -734,6 +728,18 @@
         <!-- 輸入介面 -->
         <div class="main-content active" id="inputSection">
             <div class="input-section">
+                <div class="form-group">
+                    <label for="emailInput">📧 電子郵件信箱</label>
+                    <input 
+                        type="email" 
+                        id="emailInput" 
+                        class="text-input" 
+                        style="min-height: auto; padding: 1rem;"
+                        placeholder="請輸入您的電子郵件信箱..."
+                        required
+                    />
+                </div>
+
                 <div class="form-group">
                     <label for="textInput">📝 病徵描述 / 醫療文字資料</label>
                     <textarea 
@@ -832,7 +838,7 @@
             // 從 localStorage 讀取設定，或使用預設值
             N8N_WEBHOOK: localStorage.getItem('n8n_webhook') || '',
             DIRECT_API: localStorage.getItem('direct_api') || '',
-            USE_ENDPOINT: localStorage.getItem('use_endpoint') || 'demo',
+            USE_ENDPOINT: localStorage.getItem('use_endpoint') || 'n8n',
             API_KEY: localStorage.getItem('api_key') || '',
             TIMEOUT: 180000
         };
@@ -1047,11 +1053,19 @@
             const textContent = textInput.value.trim();
             const emailContent = emailInput.value.trim();
             
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (emailContent && !emailRegex.test(emailContent)) {
-                showToast('請輸入有效的電子郵件地址', 'error');
+            // 驗證必填欄位
+            if (!emailContent) {
+                showToast('請輸入電子郵件信箱', 'error');
                 return;
             }
+            
+            // 驗證電子郵件格式
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (!emailRegex.test(emailContent)) {
+                showToast('請輸入有效的電子郵件格式', 'error');
+                return;
+            }
+            
             if (!textContent && uploadedFiles.length === 0) {
                 showToast('請輸入文字或上傳影像', 'error');
                 return;
@@ -1061,21 +1075,6 @@
             analyzeBtn.disabled = true;
 
             try {
-                // 如果是示範模式
-                if (API_CONFIG.USE_ENDPOINT === 'demo') {
-                    await new Promise(resolve => setTimeout(resolve, 3000));
-                    
-                    const demoResult = {
-                        imageAnalysis: "根據上傳的X光影像分析，觀察到肺部右下葉有輕微陰影，密度略高於正常組織。影像品質良好，可清楚辨識各解剖結構。未發現明顯的骨折或異常鈣化現象。",
-                        textAnalysis: "根據提供的病徵描述，患者出現持續性咳嗽、輕微發燒等症狀，符合呼吸道感染的臨床表現。建議進一步進行實驗室檢查以確定病原體。",
-                        diagnosis: "初步診斷：疑似輕度肺炎。影像學表現與臨床症狀一致，建議進行進一步的血液檢查和痰液培養以確定病原體類型。",
-                        recommendations: "1. 建議進行血常規檢查和CRP檢測\n2. 痰液細菌培養及藥敏試驗\n3. 適當的抗生素治療\n4. 充足休息和水分補充\n5. 一週後複診追蹤"
-                    };
-                    
-                    displayResults(demoResult);
-                    showToast('示範模式：分析完成', 'warning');
-                    return;
-                }
 
                 // 準備資料
                 const imagePromises = uploadedFiles.map(file => {
@@ -1104,8 +1103,8 @@
                 
                 // 建立請求
                 const requestBody = {
-                    text: textContent,
                     email: emailContent,
+                    text: textContent,
                     images: images,
                     timestamp: new Date().toISOString(),
                     source: 'web-frontend'
@@ -1196,8 +1195,8 @@
 
         // 新增分析
         function newAnalysis() {
-            textInput.value = '';
             emailInput.value = '';
+            textInput.value = '';
             fileInput.value = '';
             uploadedFiles = [];
             previewArea.innerHTML = '';
