@@ -269,7 +269,12 @@
             background: rgba(255, 255, 255, 0.08);
             box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
         }
-
+        input[type="email"].text-input {
+            min-height: auto;
+            height: auto;
+            font-size: 1rem;
+            font-family: inherit;
+        }
         /* 檔案上傳區域 */
         .file-upload-area {
             position: relative;
@@ -840,6 +845,7 @@
         const fileUploadArea = document.getElementById('fileUploadArea');
         const previewArea = document.getElementById('previewArea');
         const textInput = document.getElementById('textInput');
+        const emailInput = document.getElementById('emailInput');
         const analyzeBtn = document.getElementById('analyzeBtn');
         const loadingOverlay = document.getElementById('loadingOverlay');
         const inputSection = document.getElementById('inputSection');
@@ -1039,7 +1045,13 @@
         // 執行分析
         async function performAnalysis() {
             const textContent = textInput.value.trim();
+            const emailContent = emailInput.value.trim();
             
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            if (emailContent && !emailRegex.test(emailContent)) {
+                showToast('請輸入有效的電子郵件地址', 'error');
+                return;
+            }
             if (!textContent && uploadedFiles.length === 0) {
                 showToast('請輸入文字或上傳影像', 'error');
                 return;
@@ -1093,6 +1105,7 @@
                 // 建立請求
                 const requestBody = {
                     text: textContent,
+                    email: emailContent,
                     images: images,
                     timestamp: new Date().toISOString(),
                     source: 'web-frontend'
@@ -1184,6 +1197,7 @@
         // 新增分析
         function newAnalysis() {
             textInput.value = '';
+            emailInput.value = '';
             fileInput.value = '';
             uploadedFiles = [];
             previewArea.innerHTML = '';
