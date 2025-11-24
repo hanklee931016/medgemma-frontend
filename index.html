@@ -840,7 +840,7 @@
             DIRECT_API: localStorage.getItem('direct_api') || '',
             USE_ENDPOINT: localStorage.getItem('use_endpoint') || 'n8n',
             API_KEY: localStorage.getItem('api_key') || '',
-            TIMEOUT: 180000
+            TIMEOUT: 270000
         };
 
         // 全域變數
@@ -941,7 +941,7 @@
                             'Authorization': `Bearer ${API_CONFIG.API_KEY}`
                         })
                     },
-                    signal: AbortSignal.timeout(180000)
+                    signal: AbortSignal.timeout(270000)
                 });
 
                 if (response.ok || response.status === 204) {
